@@ -1,170 +1,119 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Loader2, Mail, Lock } from "lucide-react";
-import { loginSchema, LoginInput } from "@/lib/validations/auth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Mail, Lock, ShieldCheck } from "lucide-react";
 
-// 1. Core Login Form Sub-Component consuming dynamic Search Params
-function LoginForm() {
-  const [isLoading, setIsLoading] = useState(false);
+export default function Login() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema),
-  });
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
 
-  const onSubmit = async (data: LoginInput) => {
-    setIsLoading(true);
-    try {
-      const result = await signIn("credentials", {
-        email: data.email,
-        password: data.password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        toast.error(result.error);
-      } else {
-        toast.success("Welcome back! Redirecting...");
-        router.push(callbackUrl);
-        router.refresh();
-      }
-    } catch (error) {
-      toast.error("An unexpected authentication error occurred.");
-    } finally {
-      setIsLoading(false);
+    const res = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+    if (res?.error) {
+      toast.error(res.error);
+      setLoading(false);
+      return;
     }
+
+    toast.success("Security authorization token synchronization successful!");
+
+    const sessionRes = await fetch("/api/auth/session");
+    const sessionData = await sessionRes.json();
+    const role = sessionData?.user?.role;
+
+    if (role === "admin") router.push("/admin");
+    else if (role === "vendor") router.push("/seller");
+    else router.push("/");
+
+    router.refresh();
   };
 
   return (
-    <Card className="w-full max-w-md bg-white/[0.03] border-white/[0.08] backdrop-blur-xl rounded-2xl p-2 shadow-2xl shadow-purple-950/10">
-      <CardHeader className="space-y-1 text-center">
-        <CardTitle className="text-2xl font-bold font-plus-jakarta tracking-tight text-zinc-100">
-          Welcome Back
-        </CardTitle>
-        <CardDescription className="text-zinc-400 text-sm">
-          Enter your credentials to access your secure dashboard
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-2">
-            <Label
-              htmlFor="email"
-              className="text-zinc-300 font-medium text-xs"
-            >
-              Email Address
-            </Label>
+    <div className="min-h-screen bg-[#030014] flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-[#09090b]/80 border border-white/[0.06] p-8 rounded-2xl backdrop-blur-xl space-y-6">
+        <div className="text-center space-y-1">
+          <div className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-400 bg-purple-500/5 px-2.5 py-0.5 rounded-full border border-purple-500/10 mb-2">
+            <ShieldCheck className="h-3 w-3" /> Identity Security Gate
+          </div>
+          <h2 className="text-2xl font-black text-white">Access Identity</h2>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+              Email Vector
+            </label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-              <Input
-                id="email"
+              <Mail className="absolute left-3 top-3.5 h-4 w-4 text-zinc-500" />
+              <input
                 type="email"
-                placeholder="name@example.com"
-                {...register("email")}
-                className="pl-10 bg-white/[0.02] border-white/[0.08] focus:border-purple-500 rounded-xl text-zinc-200 placeholder:text-zinc-600 transition-all"
-                disabled={isLoading}
+                required
+                placeholder="identity@bento.market"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-[#030014] border border-white/[0.06] text-xs text-white focus:border-purple-500/50 outline-none transition"
               />
             </div>
-            {errors.email && (
-              <p className="text-xs text-red-400 mt-1 font-medium">
-                {errors.email.message}
-              </p>
-            )}
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label
-                htmlFor="password"
-                className="text-zinc-300 font-medium text-xs"
+          <div className="space-y-1">
+            <div className="flex justify-between items-center">
+              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                Security Key phrase
+              </label>
+              <Link
+                href="/forgot-password"
+                prefix=""
+                className="text-xs text-purple-400 hover:underline"
               >
-                Password
-              </Label>
+                Forgot?
+              </Link>
             </div>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-              <Input
-                id="password"
+              <Lock className="absolute left-3 top-3.5 h-4 w-4 text-zinc-500" />
+              <input
                 type="password"
-                placeholder="••••••••"
-                {...register("password")}
-                className="pl-10 bg-white/[0.02] border-white/[0.08] focus:border-purple-500 rounded-xl text-zinc-200 placeholder:text-zinc-600 transition-all"
-                disabled={isLoading}
+                required
+                placeholder="••••••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-[#030014] border border-white/[0.06] text-xs text-white focus:border-purple-500/50 outline-none transition"
               />
             </div>
-            {errors.password && (
-              <p className="text-xs text-red-400 mt-1 font-medium">
-                {errors.password.message}
-              </p>
-            )}
           </div>
 
-          <Button
+          <button
             type="submit"
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-medium py-2.5 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 mt-2 shadow-lg shadow-purple-500/10"
-            disabled={isLoading}
+            disabled={loading}
+            className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold rounded-xl text-xs shadow-lg shadow-purple-600/10 active:scale-[0.99] transition duration-150"
           >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin text-white" />
-            ) : (
-              "Sign In to Account"
-            )}
-          </Button>
+            {loading ? "Verifying Keys..." : "Authorize Portal Entry"}
+          </button>
         </form>
 
-        <div className="mt-6 text-center text-xs text-zinc-400">
-          Don&apos;t have an account?{" "}
+        <p className="text-center text-xs text-zinc-500 pt-2 border-t border-white/[0.04]">
+          No membership index?{" "}
           <Link
             href="/register"
-            className="text-purple-400 hover:text-purple-300 font-medium transition-colors underline underline-offset-4"
+            className="text-purple-400 font-bold hover:underline"
           >
-            Sign up
+            Create Registration Node
           </Link>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// 2. Exported Default Page Wrapper with strict Next.js App Router Suspense integration
-export default function LoginPage() {
-  return (
-    <div className="flex-grow flex items-center justify-center px-4 py-12 relative z-10">
-      <Suspense
-        fallback={
-          <Card className="w-full max-w-md bg-white/[0.03] border-white/[0.08] backdrop-blur-xl rounded-2xl p-6 flex flex-col items-center justify-center min-h-[350px]">
-            <Loader2 className="h-8 w-8 animate-spin text-purple-500 mb-4" />
-            <p className="text-zinc-400 text-sm font-medium">
-              Initializing secure portal nodes...
-            </p>
-          </Card>
-        }
-      >
-        <LoginForm />
-      </Suspense>
+        </p>
+      </div>
     </div>
   );
 }

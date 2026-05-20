@@ -1,119 +1,110 @@
 import { NextResponse } from "next/server";
+import { connectDB } from "@/lib/db/connect";
+import { Product } from "@/models/Product";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import connectDB from "@/lib/db/connect";
-import Product from "@/models/Product";
+import { authOptions } from "@/lib/validations/auth";
 
-/**
- * GET /api/products
- * Public catalog discovery endpoint with support for search, categorization, and pagination
- */
 export async function GET(req: Request) {
   try {
     await connectDB();
     const { searchParams } = new URL(req.url);
+    const scope = searchParams.get("scope");
 
-    // Parse filter matrices from query streams
-    const category = searchParams.get("category");
-    const search = searchParams.get("search");
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "12");
-    const skip = (page - 1) * limit;
+    let query = { approved: true };
 
-    const query: any = { isActive: true };
-
-    if (category) {
-      query.category = category.toLowerCase();
+    // Admin has access overrides to audit non-indexed items
+    if (scope === "admin") {
+      const session = await getServerSession(authOptions);
+      if (session && (session.user as any).role === "admin") {
+        query = {} as any;
+      }
     }
 
-    if (search) {
-      // Execute fast MongoDB indexing text search weights
-      query.$text = { $search: search };
-    }
-
-    const products = await Product.find(query)
-      .populate("sellerId", "name vendorDetails.storeName")
-      .sort(search ? { score: { $meta: "textScore" } } : { createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const totalProducts = await Product.countDocuments(query);
-
+    const products = await Product.find(query).sort({ createdAt: -1 });
     return NextResponse.json(
-      {
-        products,
-        pagination: {
-          page,
-          limit,
-          totalPages: Math.ceil(totalProducts / limit),
-          totalProducts,
-        },
-      },
+      { success: true, data: products },
       { status: 200 },
     );
   } catch (error: any) {
-    console.error("CATALOG_FETCH_EXCEPTION:", error);
     return NextResponse.json(
-      { message: "Failed to retrieve product catalog." },
+      { success: false, error: error.message },
       { status: 500 },
     );
   }
 }
 
-/**
- * POST /api/products
- * Protected inventory submission entry node for approved vendors
- */
 export async function POST(req: Request) {
   try {
+    await connectDB();
     const session = await getServerSession(authOptions);
 
-    // Guard: Enforce strict role validation checks before allocating server resources
     if (
       !session ||
-      (session.user.role !== "seller" && session.user.role !== "admin")
+      ((session.user as any).role !== "vendor" &&
+        (session.user as any).role !== "admin")
     ) {
       return NextResponse.json(
-        { message: "Unauthorized. Merchant status required." },
+        { success: false, error: "Unauthorized access path locked." },
         { status: 403 },
       );
     }
 
-    if (session.user.role === "seller" && !session.user.isApprovedSeller) {
-      return NextResponse.json(
-        { message: "Forbidden. Your vendor account is awaiting approval." },
-        { status: 403 },
-      );
-    }
-
-    await connectDB();
     const body = await req.json();
+    const { title, description, price, image, category, stock } = body;
 
-    // Helper: Generate a unique URL handle from the submission title string
-    const generatedSlug =
-      body.title
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)+/g, "") +
-      "-" +
-      Math.random().toString(36).substring(2, 7);
+    const autoApprove = (session.user as any).role === "admin";
 
-    const productPayload = {
-      ...body,
-      sellerId: session.user.id,
-      slug: generatedSlug,
-    };
-
-    const freshProduct = await Product.create(productPayload);
+    const newProduct = await Product.create({
+      title,
+      description,
+      price: Number(price),
+      image,
+      category,
+      stock: Number(stock || 5),
+      sellerId: session.user.email,
+      sellerName: session.user.name,
+      approved: autoApprove, // Admin listings bypass review queue pipelines
+    });
 
     return NextResponse.json(
-      { message: "Product listed successfully.", product: freshProduct },
+      { success: true, data: newProduct },
       { status: 201 },
     );
   } catch (error: any) {
-    console.error("PRODUCT_CREATION_EXCEPTION:", error);
     return NextResponse.json(
-      { message: error.message || "Failed to catalog product entry." },
+      { success: false, error: error.message },
+      { status: 500 },
+    );
+  }
+}
+
+// Global update method for Admin node approval actions
+export async function PATCH(req: Request) {
+  try {
+    await connectDB();
+    const session = await getServerSession(authOptions);
+
+    if (!session || (session.user as any).role !== "admin") {
+      return NextResponse.json(
+        { success: false, error: "Root privileges required." },
+        { status: 403 },
+      );
+    }
+
+    const { id, approved } = await req.json();
+    const updatedProduct = await Product.findByIdAndUpdate(
+      id,
+      { approved },
+      { new: true },
+    );
+
+    return NextResponse.json(
+      { success: true, data: updatedProduct },
+      { status: 200 },
+    );
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, error: error.message },
       { status: 500 },
     );
   }

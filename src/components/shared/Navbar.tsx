@@ -2,89 +2,82 @@
 
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
-import { ShoppingCart, User, LogOut, LayoutDashboard } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  ShoppingCart,
+  LogOut,
+  LayoutDashboard,
+  ShieldCheck,
+} from "lucide-react";
 
 export default function Navbar() {
   const { data: session } = useSession();
 
+  const getDashboardLink = () => {
+    const role = (session?.user as any)?.role;
+    if (role === "admin") return "/admin";
+    if (role === "vendor") return "/seller";
+    return null;
+  };
+
+  const dashboardPath = getDashboardLink();
+
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-white/[0.08] bg-[#030014]/70 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        {/* Branding Logotype */}
         <Link
           href="/"
-          className="flex items-center gap-2 font-plus-jakarta font-bold text-xl tracking-tight bg-gradient-to-r from-purple-400 via-indigo-200 to-blue-400 bg-clip-text text-transparent"
+          className="flex items-center gap-2 font-bold text-xl tracking-tight bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent"
         >
           BENTO<span className="text-purple-500">.</span>MARKET
         </Link>
 
-        {/* Global Action Nodes */}
         <div className="flex items-center gap-4">
-          <Link href="/cart">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative hover:bg-white/5 text-zinc-400 hover:text-zinc-100 rounded-xl transition-all"
-            >
-              <ShoppingCart className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 bg-gradient-to-r from-purple-600 to-blue-600 text-[10px] font-bold text-white w-4 h-4 rounded-full flex items-center justify-center border border-[#030014]">
-                0
-              </span>
-            </Button>
+          <Link
+            href="/cart"
+            className="relative p-2 hover:bg-white/5 text-zinc-400 hover:text-zinc-100 rounded-xl transition"
+          >
+            <ShoppingCart className="h-5 w-5" />
+            <span className="absolute -top-0.5 -right-0.5 bg-purple-600 text-[9px] font-bold text-white w-4 h-4 rounded-full flex items-center justify-center">
+              0
+            </span>
           </Link>
 
           {session ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="relative h-9 gap-2 pl-2 pr-3 hover:bg-white/5 text-zinc-300 hover:text-zinc-100 rounded-xl border border-white/[0.05] transition-all"
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+                <div className="h-5 w-5 rounded-md bg-purple-600 flex items-center justify-center text-[10px] font-bold text-white uppercase">
+                  {session.user?.name?.[0]}
+                </div>
+                <span className="text-xs font-medium text-zinc-300 hidden md:inline">
+                  {session.user?.name}
+                </span>
+                <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 text-purple-400 font-bold border border-white/5">
+                  {(session.user as any).role}
+                </span>
+              </div>
+
+              {dashboardPath && (
+                <Link
+                  href={dashboardPath}
+                  className="p-2 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-xl hover:bg-purple-500/20 transition flex items-center gap-1.5 text-xs font-bold"
                 >
-                  <div className="h-6 w-6 rounded-lg bg-gradient-to-tr from-purple-600 to-blue-600 flex items-center justify-center text-xs font-bold text-white uppercase">
-                    {session.user.name?.[0]}
-                  </div>
-                  <span className="text-sm font-medium hidden sm:inline">
-                    {session.user.name}
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-56 bg-[#09090b]/90 border-white/[0.08] backdrop-blur-xl rounded-xl p-1 text-zinc-300"
+                  <LayoutDashboard className="h-3.5 w-3.5" /> Panel
+                </Link>
+              )}
+
+              <button
+                onClick={() => signOut({ callbackUrl: "/" })}
+                className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl border border-red-500/20 transition text-xs font-bold flex items-center gap-1"
               >
-                <DropdownMenuItem
-                  asChild
-                  className="hover:bg-white/5 focus:bg-white/5 rounded-lg cursor-pointer transition-colors"
-                >
-                  <Link
-                    href={`/${session.user.role}`}
-                    className="flex items-center gap-2 w-full py-2"
-                  >
-                    <LayoutDashboard className="h-4 w-4 text-purple-400" />
-                    <span>Dashboard</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => signOut({ callbackUrl: "/" })}
-                  className="hover:bg-red-500/10 focus:bg-red-500/10 text-red-400 focus:text-red-400 rounded-lg cursor-pointer transition-colors py-2 flex items-center gap-2"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span>Sign Out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
+            </div>
           ) : (
-            <Link href="/login">
-              <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-xl font-medium shadow-lg shadow-purple-500/10 transition-all duration-300 transform active:scale-95">
-                Sign In
-              </Button>
+            <Link
+              href="/login"
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/20 hover:opacity-90 transition"
+            >
+              Sign In
             </Link>
           )}
         </div>

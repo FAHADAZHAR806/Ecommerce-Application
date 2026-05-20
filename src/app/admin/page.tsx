@@ -1,147 +1,116 @@
 "use client";
 
-import {
-  LayoutDashboard,
-  Users,
-  ShoppingBag,
-  BarChart3,
-  Settings,
-} from "lucide-react";
-import DashboardLayoutShell from "@/components/shared/DashboardLayoutShell";
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import Navbar from "@/components/shared/Navbar";
+import { ShieldAlert, Check } from "lucide-react";
+import { toast } from "sonner";
 
-const adminNavItems = [
-  { label: "Overview", href: "/admin", icon: LayoutDashboard },
-  { label: "User Management", href: "/admin/users", icon: Users },
-  { label: "Seller Approvals", href: "/admin/approvals", icon: Users },
-  { label: "Global Products", href: "/admin/products", icon: ShoppingBag },
-  { label: "System Analytics", href: "/admin/analytics", icon: BarChart3 },
-];
+export default function AdminConsole() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [logs, setLogs] = useState([]);
 
-export default function AdminDashboardPage() {
-  // Mock statistical matrices representing core transactional parameters
-  const statistics = [
-    {
-      label: "Gross Platform Volume",
-      value: "$148,920.50",
-      change: "+14.2%",
-      color: "from-purple-500 to-indigo-500",
-    },
-    {
-      label: "Active Platform Accounts",
-      value: "3,842",
-      change: "+21.8%",
-      color: "from-blue-500 to-cyan-500",
-    },
-    {
-      label: "Vendor Verification Queue",
-      value: "7 Accounts",
-      change: "Action Req.",
-      color: "from-amber-500 to-orange-500",
-    },
-    {
-      label: "Platform Conversion Rate",
-      value: "4.12%",
-      change: "+0.4%",
-      color: "from-emerald-500 to-teal-500",
-    },
-  ];
+  useEffect(() => {
+    if (session && (session.user as any).role === "admin") fetchSystemLogs();
+  }, [session]);
+
+  if (status === "loading")
+    return (
+      <div className="min-h-screen bg-[#030014] text-white flex items-center justify-center">
+        Connecting central administrative network core...
+      </div>
+    );
+  if (!session || (session.user as any).role !== "admin") {
+    router.push("/login");
+    return null;
+  }
+
+  async function fetchSystemLogs() {
+    const res = await fetch("/api/products?scope=admin");
+    const json = await res.json();
+    if (json.success) setLogs(json.data);
+  }
+
+  const handleVerificationSignature = async (id: string) => {
+    try {
+      const res = await fetch("/api/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, approved: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(
+          "Validation parameter successfully modified! Indexed live onto global feed maps.",
+        );
+        fetchSystemLogs();
+      }
+    } catch (err) {
+      toast.error("Internal transaction modification failure sequence.");
+    }
+  };
 
   return (
-    <DashboardLayoutShell title="Admin Core" navigationItems={adminNavItems}>
-      <div className="space-y-8">
-        {/* Welcome Header */}
-        <div>
-          <h1 className="text-3xl font-bold font-plus-jakarta tracking-tight text-zinc-100">
-            System Overview
-          </h1>
-          <p className="text-zinc-400 text-sm mt-1">
-            Real-time macro transaction monitoring and configuration nodes.
-          </p>
-        </div>
-
-        {/* Premium Bento UI Grid Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {statistics.map((stat, idx) => (
-            <div
-              key={idx}
-              className="relative overflow-hidden bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 backdrop-blur-md group hover:border-purple-500/30 transition-all duration-300 shadow-xl"
-            >
-              {/* Dynamic Accent Lighting Effect */}
-              <div
-                className={`absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r ${stat.color} opacity-70 group-hover:opacity-100 transition-opacity`}
-              />
-
-              <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                {stat.label}
-              </p>
-              <div className="flex items-baseline justify-between mt-4">
-                <h3 className="text-2xl font-bold font-plus-jakarta text-zinc-100 tracking-tight">
-                  {stat.value}
-                </h3>
-                <span
-                  className={`text-xs font-semibold px-2 py-0.5 rounded-lg ${
-                    stat.change.startsWith("+")
-                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                      : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                  }`}
-                >
-                  {stat.change}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Asymmetric Bento Body Components */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Analytics Graph Stand-In Frame (Large Box) */}
-          <div className="lg:col-span-2 bg-white/[0.01] border border-white/[0.04] rounded-2xl p-6 min-h-[350px] flex flex-col justify-between backdrop-blur-xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-base font-bold font-plus-jakarta text-zinc-200">
-                  Global Revenue Pipeline
-                </h4>
-                <p className="text-xs text-zinc-500">
-                  Aggregated payments collected across all storefront
-                  parameters.
-                </p>
-              </div>
-              <div className="h-2 w-2 rounded-full bg-purple-500 animate-pulse" />
-            </div>
-            <div className="flex-grow flex items-center justify-center border border-dashed border-white/[0.06] rounded-xl mt-6 bg-[#030014]/50">
-              <span className="text-xs text-zinc-600 font-medium tracking-wide uppercase">
-                Chart Engine Mock (Phase 18 Integration)
-              </span>
-            </div>
+    <div className="min-h-screen bg-[#030014] text-white">
+      <Navbar />
+      <div className="max-w-5xl mx-auto px-4 py-10 space-y-6">
+        <div className="p-4 bg-purple-950/20 border border-purple-500/20 rounded-2xl flex items-center gap-3">
+          <ShieldAlert className="h-6 w-6 text-purple-400" />
+          <div>
+            <h1 className="text-lg font-black uppercase">
+              Root Control Node Gateway
+            </h1>
+            <p className="text-xs text-zinc-400 font-medium">
+              Verify structural payloads, bypass processing holds, override
+              deployment variables.
+            </p>
           </div>
+        </div>
 
-          {/* System Status Modals Box (Small Box) */}
-          <div className="bg-white/[0.01] border border-white/[0.04] rounded-2xl p-6 flex flex-col justify-between backdrop-blur-xl">
-            <div>
-              <h4 className="text-base font-bold font-plus-jakarta text-zinc-200">
-                Recent Server Log Activity
-              </h4>
-              <p className="text-xs text-zinc-500">
-                Live configuration captures.
-              </p>
-            </div>
-            <div className="space-y-3 mt-6 flex-grow">
-              {[
-                "User auth token successfully generated",
-                "Database pool scaling triggered (+2)",
-                "Stripe webhook processed payment_intent",
-              ].map((log, i) => (
-                <div
-                  key={i}
-                  className="p-2.5 rounded-xl bg-white/[0.01] border border-white/[0.04] text-[11px] text-zinc-400 font-mono truncate"
-                >
-                  <span className="text-purple-500 mr-2">➜</span> {log}
-                </div>
+        <div className="bg-[#09090b]/80 border border-white/[0.06] rounded-2xl overflow-hidden">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-white/[0.02] border-b border-white/[0.06] text-zinc-400 uppercase tracking-wider font-bold">
+                <th className="p-4">Target Title</th>
+                <th className="p-4">Merchant Vector</th>
+                <th className="p-4">Pricing</th>
+                <th className="p-4">State Index Status</th>
+                <th className="p-4 text-right">Administrative Execution</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.04]">
+              {logs.map((item: any) => (
+                <tr key={item._id} className="hover:bg-white/[0.01] transition">
+                  <td className="p-4 font-bold text-zinc-200">{item.title}</td>
+                  <td className="p-4 text-zinc-400">{item.sellerName}</td>
+                  <td className="p-4 font-black text-purple-400">
+                    ${item.price}
+                  </td>
+                  <td className="p-4">
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${item.approved ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}
+                    >
+                      {item.approved ? "Active Live" : "Pending Audit"}
+                    </span>
+                  </td>
+                  <td className="p-4 text-right">
+                    {!item.approved && (
+                      <button
+                        onClick={() => handleVerificationSignature(item._id)}
+                        className="px-3 py-1 bg-emerald-500 text-white rounded font-bold hover:bg-emerald-400 transition inline-flex items-center gap-1 text-[11px]"
+                      >
+                        <Check className="h-3 w-3" /> Grant Authorization
+                      </button>
+                    )}
+                  </td>
+                </tr>
               ))}
-            </div>
-          </div>
+            </tbody>
+          </table>
         </div>
       </div>
-    </DashboardLayoutShell>
+    </div>
   );
 }
